@@ -1,3 +1,4 @@
+import sqlite3
 from typing import Literal
 from langchain_ollama import ChatOllama
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -21,7 +22,8 @@ class SupervisorAgent:
         self.tools = all_jarvis_tools + learning_tools + productivity_tools + automation_tools
         
         # Persistence
-        self.memory = SqliteSaver.from_conn_string("jarvis_memory.db")
+        self.conn = sqlite3.connect("jarvis_memory.db", check_same_thread=False)
+        self.memory = SqliteSaver(self.conn)
         
         # System prompt
         system_prompt = (
@@ -37,7 +39,7 @@ class SupervisorAgent:
             self.llm, 
             tools=self.tools, 
             checkpointer=self.memory,
-            state_modifier=system_prompt
+            prompt=system_prompt
         )
 
     async def process_query(self, query: str, thread_id: str = "default"):

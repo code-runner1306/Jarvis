@@ -1,3 +1,6 @@
 skills/*
 scripts/*
 *.json
+*.db
+*.pyc
+*.sqlite3

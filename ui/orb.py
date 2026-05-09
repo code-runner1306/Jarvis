@@ -2,7 +2,8 @@ import sys
 import time
 import numpy as np
 from PySide6.QtCore import Qt, QTimer, Slot
-from PySide6.QtWidgets import QApplication, QMainWindow, QOpenGLWidget
+from PySide6.QtWidgets import QApplication, QMainWindow
+from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtGui import QSurfaceFormat
 import moderngl
 
@@ -18,7 +19,7 @@ class OrbWidget(QOpenGLWidget):
         
         # Set transparent background
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        # self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint) # REMOVED: Should only be on top-level window
         
         # Timer for updates
         self.timer = QTimer(self)

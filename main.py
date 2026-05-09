@@ -1,32 +1,36 @@
 import sys
 import os
-from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import QSurfaceFormat
-from ui.orb import OrbWindow
+import warnings
+import time
+
+# Suppress annoying warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+try:
+    from langchain_core._api.deprecation import LangChainPendingDeprecationWarning
+    warnings.filterwarnings("ignore", category=LangChainPendingDeprecationWarning)
+except ImportError:
+    pass
+
 from core.engine import JarvisEngine
 
 def main():
-    # Setup for transparent OpenGL window
-    app = QApplication(sys.argv)
+    print("Initializing JARVIS Brain and Voice Systems...")
     
-    fmt = QSurfaceFormat()
-    fmt.setAlphaBufferSize(8)
-    fmt.setSamples(4)
-    QSurfaceFormat.setDefaultFormat(fmt)
-    
-    # Initialize UI
-    window = OrbWindow()
-    window.show()
-    
-    # Initialize Engine
-    engine = JarvisEngine(ui_window=window)
+    # Initialize Engine in headless mode (no UI)
+    engine = JarvisEngine(ui_window=None)
     engine.start()
     
-    print("JARVIS is online and listening...")
+    print("\n" + "="*50)
+    print("JARVIS IS ONLINE")
+    print("Listening for 'Hey Jarvis'...")
+    print("Press Ctrl+C to shut down.")
+    print("="*50 + "\n")
     
     try:
-        sys.exit(app.exec())
+        while True:
+            time.sleep(1)
     except KeyboardInterrupt:
+        print("\nShutting down JARVIS...")
         engine.stop()
         print("JARVIS is offline.")
 

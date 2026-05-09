@@ -6,8 +6,10 @@ class STTEngine:
         self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
 
     def transcribe(self, audio_data: np.ndarray) -> str:
-        # Ensure audio is float32
-        if audio_data.dtype != np.float32:
+        # Ensure audio is float32 and normalized
+        if audio_data.dtype == np.int16:
+            audio_data = audio_data.astype(np.float32) / 32768.0
+        elif audio_data.dtype != np.float32:
             audio_data = audio_data.astype(np.float32)
             
         segments, info = self.model.transcribe(audio_data, beam_size=5)
