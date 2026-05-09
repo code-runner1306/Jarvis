@@ -4,3 +4,6 @@ scripts/*
 *.db
 *.pyc
 *.sqlite3
+*.db-shm
+*.db-wal
+*.env

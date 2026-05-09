@@ -32,47 +32,77 @@ class JarvisEngine:
 
     def on_voice_event(self, event, data=None):
         if event == "WAKE_WORD_DETECTED":
-            print("[ENGINE] Wake word detected, getting dynamic response from Ollama...")
-            # Get a dynamic response from the AI for the wake word
+            print("[ENGINE] Wake word detected, generating greeting via Ollama...")
             asyncio.run_coroutine_threadsafe(self._respond_to_wakeword(), self.loop)
             
         elif event == "SPEECH_COMPLETE":
             print("[ENGINE] Speech captured, starting transcription...")
-            asyncio.run_coroutine_threadsafe(self.process_voice_command(data), self.loop)
+            asyncio.run_coroutine_threadsafe(self._process_voice_command(data), self.loop)
 
     async def _respond_to_wakeword(self):
-        # We pass "Hey Jarvis" to the agent so it can respond naturally
-        response = await self.agent.process_query("Hey Jarvis")
-        print(f"[JARVIS] {response}")
-        await self.tts.speak(response)
-        # Reset the listener timeout so the user has time to speak after the greeting
-        self.listener.reset_timeout()
+        """Generate a dynamic greeting and THEN open the mic for commands."""
+        try:
+            response = await self.agent.process_query("Hey Jarvis")
+            print(f"[JARVIS] {response}")
+            await self.tts.speak(response)
+        except Exception as e:
+            print(f"[ENGINE ERROR] Failed to respond to wake word: {e}")
+        finally:
+            # NOW open the microphone for the user's command
+            self.listener.enter_command_mode()
 
-    async def process_voice_command(self, audio_data):
-        # 1. Transcribe
-        print("[ENGINE] Transcribing audio with Faster-Whisper...")
-        text = self.stt.transcribe(audio_data)
-        if not text:
-            print("[ENGINE] Transcription empty, ignoring.")
-            return
+    async def _process_voice_command(self, audio_data):
+        """Transcribe, think, speak, then determine next state."""
+        try:
+            # 1. Transcribe
+            print("[ENGINE] Transcribing audio with Faster-Whisper...")
+            text = self.stt.transcribe(audio_data)
+            if not text or text.strip() in (".", ". . . .", "..."):
+                print("[ENGINE] Transcription empty or noise, ignoring.")
+                self.listener.enter_wake_word_mode()
+                return
+                
+            print(f"[USER] {text}")
             
-        print(f"[USER] {text}")
-        
-        # 2. Process with Brain
-        print(f"[ENGINE] Consulting Brain (model: {self.agent.llm.model})...")
-        response = await self.agent.process_query(text)
-        print(f"[JARVIS] {response}")
-        
-        # 3. Speak response
-        print("[ENGINE] Generating speech...")
-        await self.tts.speak(response)
-        print("[ENGINE] Speech complete. Ready for next command.")
+            # Check for exit phrase in user input
+            text_lower = text.lower()
+            exit_phrases = ["thank you", "thanks", "that's all", "goodbye", "bye", "go to sleep", "stop listening"]
+            is_exit = any(phrase in text_lower for phrase in exit_phrases)
+            
+            # Callback for real-time narration during tool calls
+            async def narrate(msg):
+                print(f"[JARVIS NARRATION] {msg}")
+                await self.tts.speak(msg)
+                
+            # 2. Process with Brain
+            model_name = getattr(self.agent.llm, "model", "Unknown")
+            print(f"[ENGINE] Consulting Brain (model: {model_name})...")
+            response = await self.agent.process_query(text, narration_callback=narrate)
+            print(f"[JARVIS] {response}")
+            
+            # 3. Speak response
+            print("[ENGINE] Generating speech...")
+            await self.tts.speak(response)
+            print("[ENGINE] Speech complete.")
+            
+            # 4. Decide next state
+            if is_exit:
+                print("[ENGINE] Exit phrase detected. Returning to sleep.")
+                self.listener.enter_wake_word_mode()
+            else:
+                self.listener.enter_command_mode()
+                
+        except Exception as e:
+            print(f"[ENGINE ERROR] Failed to process voice command: {e}")
+            self.listener.enter_wake_word_mode()
 
     def start(self):
         self.listener.start()
         activity_monitor.start()
 
     def stop(self):
+        print("[ENGINE] Shutting down... cleaning up memory.")
+        asyncio.run_coroutine_threadsafe(self.agent.heal_memory(), self.loop)
         self.listener.stop()
         activity_monitor.stop()
         self.loop.call_soon_threadsafe(self.loop.stop)
